@@ -1,0 +1,35 @@
+# Dependabot: parches y menores van agrupados en un PR por ecosistema (los
+# fusiona dependabot-automerge.yml si la CI pasa); los mayores llegan sueltos.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Asuncion
+    open-pull-requests-limit: 10
+    groups:
+      menores-frontend:
+        update-types: [minor, patch]
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Asuncion
+    groups:
+      menores-backend:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Asuncion
+    groups:
+      actions:
+        update-types: [minor, patch]
