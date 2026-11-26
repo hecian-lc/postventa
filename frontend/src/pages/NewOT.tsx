@@ -86,7 +86,7 @@ export default function NewOT() {
     onSuccess: (data) => navigate(`/ots/${data.id}`),
   })
 
-  function set(key: keyof FormData, value: any) {
+  function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm(prev => ({ ...prev, [key]: value }))
   }
 

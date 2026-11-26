@@ -32,22 +32,38 @@ function KPI({ title, value, sub, color, icon: Icon }: {
   )
 }
 
+interface FinanceStats {
+  invoiced_month: number; collected_month: number; expenses_month: number
+  balance_month: number; pending_collection: number; overdue_count: number
+  monthly_trend: { month: string; ingresos: number; gastos: number }[]
+  by_category: { category: string; total: number }[]
+  top_clients: { name: string; total: number }[]
+}
+
+interface InvoiceSummary {
+  id: number; invoice_number: string; status: string; total: number
+  client?: { name: string }
+}
+
+// recharts entrega el valor como número, texto o lista según la serie
+const fmtValor = (v: unknown) => `$${fmt(Number(v))}`
+
 const fmt = (n: number) =>
   n.toLocaleString('es', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 
 export default function Finance() {
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading } = useQuery<FinanceStats>({
     queryKey: ['finance-stats'],
     queryFn: () => api.get('/finances/stats').then(r => r.data),
     refetchInterval: 120_000,
   })
 
-  const { data: pendingInvoices = [] } = useQuery({
+  const { data: pendingInvoices = [] } = useQuery<InvoiceSummary[]>({
     queryKey: ['invoices-pending'],
     queryFn: () => api.get('/invoices', { params: { status: 'emitida' } }).then(r => r.data),
   })
 
-  const { data: overdueInvoices = [] } = useQuery({
+  const { data: overdueInvoices = [] } = useQuery<InvoiceSummary[]>({
     queryKey: ['invoices-overdue'],
     queryFn: () => api.get('/invoices', { params: { status: 'vencida' } }).then(r => r.data),
   })
@@ -58,7 +74,7 @@ export default function Finance() {
     </div>
   )
 
-  const pieData = (stats?.by_category ?? []).map((c: any) => ({
+  const pieData = (stats?.by_category ?? []).map(c => ({
     name: CATEGORY_LABELS[c.category] ?? c.category,
     value: c.total,
   }))
@@ -96,7 +112,7 @@ export default function Finance() {
             <BarChart data={stats?.monthly_trend ?? []}>
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
               <YAxis tickFormatter={v => `$${fmt(v)}`} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(v: any) => `$${fmt(v)}`} />
+              <Tooltip formatter={fmtValor} />
               <Legend />
               <Bar dataKey="ingresos" name="Ingresos" fill="#2563eb" radius={[3, 3, 0, 0]} />
               <Bar dataKey="gastos" name="Gastos" fill="#ef4444" radius={[3, 3, 0, 0]} />
@@ -113,15 +129,15 @@ export default function Finance() {
                 <PieChart>
                   <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70}
                     dataKey="value" nameKey="name">
-                    {pieData.map((_: any, i: number) => (
+                    {pieData.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <PieTooltip formatter={(v: any) => `$${fmt(v)}`} />
+                  <PieTooltip formatter={fmtValor} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="space-y-1.5 mt-2">
-                {pieData.map((item: any, i: number) => (
+                {pieData.map((item, i) => (
                   <div key={item.name} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
@@ -144,7 +160,7 @@ export default function Finance() {
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="text-sm font-semibold text-gray-700 mb-4">Top clientes por facturación</h2>
             <div className="space-y-2">
-              {stats.top_clients.map((c: any, i: number) => (
+              {stats?.top_clients.map((c, i) => (
                 <div key={c.name} className="flex items-center gap-3">
                   <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">{i + 1}</span>
                   <span className="flex-1 text-sm text-gray-700 truncate">{c.name}</span>
@@ -172,7 +188,7 @@ export default function Finance() {
             </div>
           )}
           <div className="space-y-2">
-            {[...overdueInvoices.slice(0, 3), ...pendingInvoices.slice(0, 4)].slice(0, 6).map((inv: any) => (
+            {[...overdueInvoices.slice(0, 3), ...pendingInvoices.slice(0, 4)].slice(0, 6).map(inv => (
               <Link key={inv.id} to="/facturas"
                 className="flex items-center justify-between text-sm hover:bg-gray-50 rounded px-1 py-0.5 transition-colors">
                 <div>

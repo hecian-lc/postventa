@@ -4,10 +4,12 @@ import { Plus, Search, ChevronRight, X, Building2, Phone, Mail } from 'lucide-re
 import api from '../lib/api'
 import type { Client } from '../types'
 
+type ClientInput = Pick<Client, 'name'> & Required<Pick<Client, 'company' | 'rut' | 'email' | 'phone' | 'address' | 'notes'>>
+
 function ClientForm({ initial, onSave, onCancel }: {
-  initial?: Partial<Client>; onSave: (d: any) => void; onCancel: () => void
+  initial?: Partial<Client>; onSave: (d: ClientInput) => void; onCancel: () => void
 }) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ClientInput>({
     name: initial?.name ?? '',
     company: initial?.company ?? '',
     rut: initial?.rut ?? '',
@@ -72,12 +74,12 @@ export default function Clients() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (d: any) => api.post('/clients', d).then(r => r.data),
+    mutationFn: (d: ClientInput) => api.post('/clients', d).then(r => r.data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['clients'] }); setShowForm(false) },
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...d }: any) => api.put(`/clients/${id}`, d).then(r => r.data),
+    mutationFn: ({ id, ...d }: ClientInput & { id: number }) => api.put(`/clients/${id}`, d).then(r => r.data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['clients'] }); setEditing(null) },
   })
 

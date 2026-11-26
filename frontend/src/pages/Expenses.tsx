@@ -20,8 +20,13 @@ interface Expense {
   created_by: { id: number; name: string }; created_at: string
 }
 
+interface ExpenseInput {
+  description: string; category: string; amount: number; expense_date: string
+  supplier: string; receipt_number: string; notes: string; work_order_id?: number
+}
+
 function ExpenseForm({ initial, onSave, onCancel }: {
-  initial?: Partial<Expense>; onSave: (d: any) => void; onCancel: () => void
+  initial?: Partial<Expense>; onSave: (d: ExpenseInput) => void; onCancel: () => void
 }) {
   const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
@@ -34,7 +39,7 @@ function ExpenseForm({ initial, onSave, onCancel }: {
     notes: initial?.notes ?? '',
     work_order_id: initial?.work_order_id ?? '',
   })
-  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm(p => ({ ...p, [k]: v }))
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -117,11 +122,11 @@ export default function Expenses() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (d: any) => api.post('/expenses', d),
+    mutationFn: (d: ExpenseInput) => api.post('/expenses', d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['expenses'] }); qc.invalidateQueries({ queryKey: ['finance-stats'] }); setShowForm(false) },
   })
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...d }: any) => api.put(`/expenses/${id}`, d),
+    mutationFn: ({ id, ...d }: ExpenseInput & { id: number }) => api.put(`/expenses/${id}`, d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['expenses'] }); qc.invalidateQueries({ queryKey: ['finance-stats'] }); setEditing(null) },
   })
   const deleteMutation = useMutation({

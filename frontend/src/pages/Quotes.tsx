@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Plus, Search, FileText, Download, ChevronRight, X, Trash2 } from 'lucide-react'
 import api from '../lib/api'
+import type { WorkOrderSummary } from '../types'
 
 type QuoteStatus = 'borrador' | 'enviada' | 'aprobada' | 'rechazada'
 
@@ -29,9 +30,14 @@ const ITEM_TYPES = [
   { value: 'otro', label: 'Otro' },
 ]
 
+type QuoteInput = {
+  work_order_id: number | null; title: string; notes: string
+  valid_until?: string; items: QuoteItem[]
+}
+
 function QuoteEditor({ initial, onSave, onCancel }: {
   initial?: Partial<Quote> & { work_order_id?: number }
-  onSave: (d: any) => void; onCancel: () => void
+  onSave: (d: QuoteInput) => void; onCancel: () => void
 }) {
   const [title, setTitle] = useState(initial?.title ?? '')
   const [notes, setNotes] = useState('')
@@ -40,7 +46,7 @@ function QuoteEditor({ initial, onSave, onCancel }: {
   const [otSearch, setOtSearch] = useState('')
   const [selectedOT, setSelectedOT] = useState(initial?.work_order_id ?? initial?.work_order?.id ?? null as null | number)
 
-  const { data: ots = [] } = useQuery({
+  const { data: ots = [] } = useQuery<WorkOrderSummary[]>({
     queryKey: ['ots-search', otSearch],
     queryFn: () => api.get('/work-orders', { params: { search: otSearch || undefined } }).then(r => r.data),
     enabled: !selectedOT,
@@ -48,7 +54,7 @@ function QuoteEditor({ initial, onSave, onCancel }: {
 
   const addItem = () => setItems(p => [...p, { description: '', quantity: 1, unit_price: 0, item_type: 'mano_obra' }])
   const removeItem = (i: number) => setItems(p => p.filter((_, idx) => idx !== i))
-  const setItem = (i: number, k: string, v: any) =>
+  const setItem = <K extends keyof QuoteItem>(i: number, k: K, v: QuoteItem[K]) =>
     setItems(p => p.map((item, idx) => idx === i ? { ...item, [k]: v } : item))
 
   const total = items.reduce((s, it) => s + it.quantity * it.unit_price, 0)
@@ -68,7 +74,7 @@ function QuoteEditor({ initial, onSave, onCancel }: {
               <input value={otSearch} onChange={e => setOtSearch(e.target.value)} placeholder="Buscar OT..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg divide-y">
-                {ots.map((ot: any) => (
+                {ots.map(ot => (
                   <button key={ot.id} onClick={() => setSelectedOT(ot.id)}
                     className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50">
                     <span className="font-mono text-blue-700 mr-2">{ot.ot_number}</span>
@@ -187,11 +193,11 @@ export default function Quotes() {
   )
 
   const createMutation = useMutation({
-    mutationFn: (d: any) => api.post('/quotes', d).then(r => r.data),
+    mutationFn: (d: QuoteInput) => api.post('/quotes', d).then(r => r.data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['quotes'] }); setShowForm(false) },
   })
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...d }: any) => api.put(`/quotes/${id}`, d).then(r => r.data),
+    mutationFn: ({ id, ...d }: QuoteInput & { id: number }) => api.put(`/quotes/${id}`, d).then(r => r.data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['quotes'] }); setEditing(null) },
   })
   const changeStatus = useMutation({
@@ -199,7 +205,7 @@ export default function Quotes() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['quotes'] }),
   })
 
-  function downloadPDF(id: number, _quoteNumber: string) {
+  function downloadPDF(id: number) {
     window.open(`/api/quotes/${id}/pdf`, '_blank')
   }
 
@@ -257,7 +263,7 @@ export default function Quotes() {
                 {Object.entries(STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
 
-              <button onClick={() => downloadPDF(q.id, q.quote_number)}
+              <button onClick={() => downloadPDF(q.id)}
                 className="text-gray-400 hover:text-blue-600" title="Descargar PDF">
                 <Download className="w-4 h-4" />
               </button>
