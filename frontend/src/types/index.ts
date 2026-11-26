@@ -53,8 +53,8 @@ export interface WorkOrderSummary {
 
 export interface WorkOrderHistory {
   id: number
-  old_status?: string
-  new_status: string
+  old_status?: OTStatus
+  new_status: OTStatus
   notes?: string
   changed_at: string
   changed_by: { id: number; name: string }

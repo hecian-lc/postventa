@@ -9,16 +9,21 @@ interface SparePart {
   supplier?: string; location?: string; low_stock: boolean
 }
 
+type SparePartInput = {
+  code: string; name: string; description: string; quantity: number
+  min_stock: number; unit_price: number | ''; supplier: string; location: string
+}
+
 function SparePartForm({ initial, onSave, onCancel }: {
-  initial?: Partial<SparePart>; onSave: (d: any) => void; onCancel: () => void
+  initial?: Partial<SparePart>; onSave: (d: SparePartInput) => void; onCancel: () => void
 }) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<SparePartInput>({
     code: initial?.code ?? '', name: initial?.name ?? '',
     description: initial?.description ?? '', quantity: initial?.quantity ?? 0,
     min_stock: initial?.min_stock ?? 1, unit_price: initial?.unit_price ?? '',
     supplier: initial?.supplier ?? '', location: initial?.location ?? '',
   })
-  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
+  const set = (k: keyof SparePartInput, v: string | number) => setForm(p => ({ ...p, [k]: v }))
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -28,7 +33,7 @@ function SparePartForm({ initial, onSave, onCancel }: {
           <button onClick={onCancel}><X className="w-5 h-5 text-gray-400" /></button>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {[
+          {([
             { k: 'name', l: 'Nombre *', c: 2, t: 'text' },
             { k: 'code', l: 'Código', c: 1, t: 'text' },
             { k: 'location', l: 'Ubicación', c: 1, t: 'text' },
@@ -37,10 +42,10 @@ function SparePartForm({ initial, onSave, onCancel }: {
             { k: 'unit_price', l: 'Precio unitario', c: 1, t: 'number' },
             { k: 'supplier', l: 'Proveedor', c: 1, t: 'text' },
             { k: 'description', l: 'Descripción', c: 2, t: 'text' },
-          ].map(f => (
+          ] satisfies { k: keyof SparePartInput; l: string; c: number; t: 'text' | 'number' }[]).map(f => (
             <div key={f.k} style={{ gridColumn: `span ${f.c}` }}>
               <label className="block text-xs font-medium text-gray-600 mb-1">{f.l}</label>
-              <input type={f.t} value={form[f.k as keyof typeof form]}
+              <input type={f.t} value={form[f.k]}
                 onChange={e => set(f.k, f.t === 'number' ? Number(e.target.value) : e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
@@ -115,11 +120,11 @@ export default function SpareParts() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (d: any) => api.post('/spare-parts', d),
+    mutationFn: (d: SparePartInput) => api.post('/spare-parts', d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['spare-parts'] }); setShowForm(false) },
   })
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...d }: any) => api.put(`/spare-parts/${id}`, d),
+    mutationFn: ({ id, ...d }: SparePartInput & { id: number }) => api.put(`/spare-parts/${id}`, d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['spare-parts'] }); setEditing(null) },
   })
 

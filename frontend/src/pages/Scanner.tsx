@@ -36,15 +36,16 @@ export default function Scanner() {
         },
         undefined
       )
-    } catch (err: any) {
+    } catch (err: unknown) {
       setScanning(false)
-      setError(err?.message ?? 'No se pudo acceder a la cámara')
+      setError(err instanceof Error ? err.message : 'No se pudo acceder a la cámara')
     }
   }
 
   async function stopScanner() {
     if (scannerRef.current?.isScanning) {
-      try { await scannerRef.current.stop() } catch {}
+      // Si ya se había detenido (o la cámara se cerró sola), no hay nada que hacer.
+      try { await scannerRef.current.stop() } catch { /* ya detenido */ }
     }
     scannerRef.current = null
     setScanning(false)

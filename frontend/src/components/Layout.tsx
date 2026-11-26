@@ -103,8 +103,12 @@ export default function Layout() {
                       boxShadow: '0 2px 8px rgba(249,115,22,0.35)',
                     } : {}}
                   >
-                    <Icon className="w-4 h-4 shrink-0" strokeWidth={isActiveCheck(to, exact) ? 2.5 : 1.75} />
-                    <span className="truncate">{label}</span>
+                    {({ isActive }) => (
+                      <>
+                        <Icon className="w-4 h-4 shrink-0" strokeWidth={isActive ? 2.5 : 1.75} />
+                        <span className="truncate">{label}</span>
+                      </>
+                    )}
                   </NavLink>
                 ))}
               </div>
@@ -163,6 +167,3 @@ export default function Layout() {
     </div>
   )
 }
-
-// Helper para strokeWidth en NavLink (no tiene acceso al isActive fuera del render)
-function isActiveCheck(_to: string, _exact?: boolean) { return false }

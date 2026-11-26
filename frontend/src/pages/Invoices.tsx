@@ -33,13 +33,27 @@ interface Invoice {
   client_id: number; work_order_id?: number
 }
 
+interface ClientOption { id: number; name: string; company?: string }
+interface WorkOrderOption { id: number; ot_number: string }
+// GET /quotes devuelve el resumen (sin ítems); los ítems salen de GET /quotes/{id}
+interface QuoteSummary { id: number; quote_number: string; title: string; work_order: { id: number } }
+interface QuoteDetail extends QuoteSummary { items: InvoiceItem[] }
+
+interface PaymentInput { status: 'pagada'; payment_date: string; payment_method: string }
+interface StatusInput { status: 'emitida' }
+interface InvoiceInput {
+  client_id: number; work_order_id?: number; quote_id?: number
+  due_date?: string; payment_method?: string; notes?: string
+  items: InvoiceItem[]
+}
+
 function fmt(n: number) {
   return n.toLocaleString('es', { minimumFractionDigits: 2 })
 }
 
 /* ── Mark-as-paid modal ─────────────────────────────────── */
 function PayModal({ invoice, onSave, onCancel }: {
-  invoice: Invoice; onSave: (d: any) => void; onCancel: () => void
+  invoice: Invoice; onSave: (d: PaymentInput) => void; onCancel: () => void
 }) {
   const today = new Date().toISOString().slice(0, 10)
   const [payDate, setPayDate] = useState(today)
@@ -78,7 +92,7 @@ function PayModal({ invoice, onSave, onCancel }: {
 
 /* ── Invoice form modal ─────────────────────────────────── */
 function InvoiceForm({ initial, onSave, onCancel }: {
-  initial?: Partial<Invoice>; onSave: (d: any) => void; onCancel: () => void
+  initial?: Partial<Invoice>; onSave: (d: InvoiceInput) => void; onCancel: () => void
 }) {
   const [clientId, setClientId] = useState<string>(initial?.client_id?.toString() ?? '')
   const [workOrderId, setWorkOrderId] = useState<string>(initial?.work_order_id?.toString() ?? '')
@@ -90,15 +104,15 @@ function InvoiceForm({ initial, onSave, onCancel }: {
     initial?.items?.length ? initial.items : [{ description: '', quantity: 1, unit_price: 0 }]
   )
 
-  const { data: clients = [] } = useQuery<any[]>({
+  const { data: clients = [] } = useQuery<ClientOption[]>({
     queryKey: ['clients-list'],
     queryFn: () => api.get('/clients').then(r => r.data),
   })
-  const { data: workOrders = [] } = useQuery<any[]>({
+  const { data: workOrders = [] } = useQuery<WorkOrderOption[]>({
     queryKey: ['ots-list'],
     queryFn: () => api.get('/work-orders', { params: { limit: 200 } }).then(r => r.data),
   })
-  const { data: quotes = [] } = useQuery<any[]>({
+  const { data: quotes = [] } = useQuery<QuoteSummary[]>({
     queryKey: ['quotes-list'],
     queryFn: () => api.get('/quotes').then(r => r.data),
     enabled: !!workOrderId,
@@ -106,17 +120,16 @@ function InvoiceForm({ initial, onSave, onCancel }: {
 
   function addItem() { setItems(p => [...p, { description: '', quantity: 1, unit_price: 0 }]) }
   function removeItem(i: number) { setItems(p => p.filter((_, j) => j !== i)) }
-  function setItem(i: number, k: string, v: any) {
+  function setItem<K extends keyof InvoiceItem>(i: number, k: K, v: InvoiceItem[K]) {
     setItems(p => p.map((x, j) => j === i ? { ...x, [k]: v } : x))
   }
 
-  function handleQuoteChange(qid: string) {
+  async function handleQuoteChange(qid: string) {
     setQuoteId(qid)
     if (!qid) return
-    const q = (quotes as any[]).find(q => q.id === Number(qid))
-    if (!q) return
-    if (q.work_order_id) setWorkOrderId(String(q.work_order_id))
-    setItems(q.items.map((it: any) => ({
+    const q = await api.get<QuoteDetail>(`/quotes/${qid}`).then(r => r.data)
+    setWorkOrderId(String(q.work_order.id))
+    setItems(q.items.map(it => ({
       description: it.description, quantity: it.quantity, unit_price: it.unit_price,
     })))
   }
@@ -150,7 +163,7 @@ function InvoiceForm({ initial, onSave, onCancel }: {
             <select value={clientId} onChange={e => setClientId(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">Seleccionar cliente...</option>
-              {(clients as any[]).map((c: any) => (
+              {clients.map(c => (
                 <option key={c.id} value={c.id}>{c.name}{c.company ? ` — ${c.company}` : ''}</option>
               ))}
             </select>
@@ -161,7 +174,7 @@ function InvoiceForm({ initial, onSave, onCancel }: {
             <select value={workOrderId} onChange={e => setWorkOrderId(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none">
               <option value="">Sin OT</option>
-              {(workOrders as any[]).map((o: any) => (
+              {workOrders.map(o => (
                 <option key={o.id} value={o.id}>{o.ot_number}</option>
               ))}
             </select>
@@ -173,9 +186,9 @@ function InvoiceForm({ initial, onSave, onCancel }: {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none"
               disabled={!workOrderId}>
               <option value="">— Seleccionar —</option>
-              {(quotes as any[])
-                .filter((q: any) => !workOrderId || q.work_order_id === Number(workOrderId))
-                .map((q: any) => (
+              {quotes
+                .filter(q => !workOrderId || q.work_order.id === Number(workOrderId))
+                .map(q => (
                   <option key={q.id} value={q.id}>{q.quote_number} — {q.title}</option>
                 ))}
             </select>
@@ -221,12 +234,12 @@ function InvoiceForm({ initial, onSave, onCancel }: {
                 </div>
                 <div className="col-span-2">
                   <input type="number" placeholder="Cant." value={it.quantity} min={1}
-                    onChange={e => setItem(i, 'quantity', e.target.value)}
+                    onChange={e => setItem(i, 'quantity', Number(e.target.value))}
                     className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none text-right" />
                 </div>
                 <div className="col-span-3">
                   <input type="number" placeholder="P. Unit." value={it.unit_price} min={0} step="0.01"
-                    onChange={e => setItem(i, 'unit_price', e.target.value)}
+                    onChange={e => setItem(i, 'unit_price', Number(e.target.value))}
                     className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none text-right" />
                 </div>
                 <div className="col-span-1 flex justify-end">
@@ -273,11 +286,11 @@ export default function Invoices() {
   })
 
   const createMut = useMutation({
-    mutationFn: (d: any) => api.post('/invoices', d),
+    mutationFn: (d: InvoiceInput) => api.post('/invoices', d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); qc.invalidateQueries({ queryKey: ['finance-stats'] }); setShowForm(false) },
   })
   const updateMut = useMutation({
-    mutationFn: ({ id, ...d }: any) => api.put(`/invoices/${id}`, d),
+    mutationFn: ({ id, ...d }: (InvoiceInput | PaymentInput | StatusInput) & { id: number }) => api.put(`/invoices/${id}`, d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); qc.invalidateQueries({ queryKey: ['finance-stats'] }); setEditing(null); setPaying(null) },
   })
   const deleteMut = useMutation({

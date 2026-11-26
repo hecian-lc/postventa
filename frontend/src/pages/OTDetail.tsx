@@ -6,7 +6,11 @@ import {
   Clock, User, Calendar, Wrench,
 } from 'lucide-react'
 import api from '../lib/api'
-import type { WorkOrder } from '../types'
+import type { KnowledgeEntry, OTStatus, WorkOrder } from '../types'
+
+type KnowledgeInput = Pick<KnowledgeEntry, 'equipment_type' | 'brand' | 'model' | 'symptoms' | 'diagnosis' | 'solution'> & {
+  components_replaced: string; tags: string; repair_time_hours?: number
+}
 import { StatusBadge, PriorityBadge } from '../components/StatusBadge'
 import { STATUS_LABELS, ALL_STATUSES } from '../lib/constants'
 
@@ -24,7 +28,7 @@ export default function OTDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const [newStatus, setNewStatus] = useState('')
+  const [newStatus, setNewStatus] = useState<OTStatus | ''>('')
   const [statusNote, setStatusNote] = useState('')
   const [aiTab, setAiTab] = useState<'diagnosis' | 'report' | null>(null)
   const [aiResult, setAiResult] = useState('')
@@ -41,12 +45,12 @@ export default function OTDetail() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: any) => api.put(`/work-orders/${id}`, data).then(r => r.data),
+    mutationFn: (data: { status: OTStatus; notes: string }) => api.put(`/work-orders/${id}`, data).then(r => r.data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['work-order', id] }); setNewStatus(''); setStatusNote('') },
   })
 
   const kbMutation = useMutation({
-    mutationFn: (data: any) => api.post(`/work-orders/${id}/knowledge`, data).then(r => r.data),
+    mutationFn: (data: KnowledgeInput) => api.post(`/work-orders/${id}/knowledge`, data).then(r => r.data),
     onSuccess: () => { setShowKB(false); alert('Caso agregado a la bitácora') },
   })
 
@@ -208,7 +212,7 @@ export default function OTDetail() {
             <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Cambiar Estado</h3>
             <select
               value={newStatus}
-              onChange={e => setNewStatus(e.target.value)}
+              onChange={e => setNewStatus(e.target.value as OTStatus | '')}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm mb-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Seleccionar nuevo estado...</option>
@@ -224,7 +228,7 @@ export default function OTDetail() {
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none mb-2 focus:outline-none focus:ring-1 focus:ring-blue-400"
             />
             <button
-              onClick={() => updateMutation.mutate({ status: newStatus, notes: statusNote })}
+              onClick={() => { if (newStatus) updateMutation.mutate({ status: newStatus, notes: statusNote }) }}
               disabled={!newStatus || updateMutation.isPending}
               className="w-full py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
@@ -298,12 +302,12 @@ export default function OTDetail() {
                 <div className="flex-1">
                   {h.old_status ? (
                     <span className="text-gray-600">
-                      <StatusBadge status={h.old_status as any} />
+                      <StatusBadge status={h.old_status} />
                       <span className="mx-2 text-gray-300">→</span>
-                      <StatusBadge status={h.new_status as any} />
+                      <StatusBadge status={h.new_status} />
                     </span>
                   ) : (
-                    <StatusBadge status={h.new_status as any} />
+                    <StatusBadge status={h.new_status} />
                   )}
                   {h.notes && <p className="text-gray-500 text-xs mt-1">{h.notes}</p>}
                 </div>

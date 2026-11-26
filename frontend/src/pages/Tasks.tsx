@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, CheckCircle2, Circle, Clock, X, Calendar, ChevronLeft, ChevronRight as ChevronR } from 'lucide-react'
 import api from '../lib/api'
+import type { User } from '../types'
 
 type TStatus = 'pendiente' | 'en_progreso' | 'completada'
 type TPriority = 'baja' | 'normal' | 'alta'
@@ -23,11 +24,16 @@ const S_COLORS: Record<TStatus, string> = {
   pendiente: 'text-gray-400', en_progreso: 'text-blue-500', completada: 'text-green-500',
 }
 
+type TaskInput = {
+  title: string; description: string; priority: TPriority; status: TStatus
+  due_date: string; assigned_to_id: number | ''; work_order_id: number | ''
+}
+
 function TaskForm({ initial, users, onSave, onCancel }: {
   initial?: Partial<Task> & { work_order_id?: number }
-  users: any[]; onSave: (d: any) => void; onCancel: () => void
+  users: User[]; onSave: (d: TaskInput) => void; onCancel: () => void
 }) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<TaskInput>({
     title: initial?.title ?? '',
     description: initial?.description ?? '',
     priority: initial?.priority ?? 'normal',
@@ -36,7 +42,7 @@ function TaskForm({ initial, users, onSave, onCancel }: {
     assigned_to_id: initial?.assigned_to?.id ?? '',
     work_order_id: initial?.work_order_id ?? initial?.work_order?.id ?? '',
   })
-  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
+  const set = <K extends keyof TaskInput>(k: K, v: TaskInput[K]) => setForm(p => ({ ...p, [k]: v }))
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -59,7 +65,7 @@ function TaskForm({ initial, users, onSave, onCancel }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Prioridad</label>
-              <select value={form.priority} onChange={e => set('priority', e.target.value)}
+              <select value={form.priority} onChange={e => set('priority', e.target.value as TPriority)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none">
                 <option value="baja">Baja</option>
                 <option value="normal">Normal</option>
@@ -68,7 +74,7 @@ function TaskForm({ initial, users, onSave, onCancel }: {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Estado</label>
-              <select value={form.status} onChange={e => set('status', e.target.value)}
+              <select value={form.status} onChange={e => set('status', e.target.value as TStatus)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none">
                 <option value="pendiente">Pendiente</option>
                 <option value="en_progreso">En progreso</option>
@@ -85,7 +91,7 @@ function TaskForm({ initial, users, onSave, onCancel }: {
               <select value={form.assigned_to_id} onChange={e => set('assigned_to_id', e.target.value ? Number(e.target.value) : '')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none">
                 <option value="">Sin asignar</option>
-                {users.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
           </div>
@@ -157,17 +163,17 @@ export default function Tasks() {
     queryFn: () => api.get('/tasks', { params: { status: filterStatus || undefined } }).then(r => r.data),
   })
 
-  const { data: users = [] } = useQuery({
+  const { data: users = [] } = useQuery<User[]>({
     queryKey: ['users'],
     queryFn: () => api.get('/users').then(r => r.data),
   })
 
   const createMutation = useMutation({
-    mutationFn: (d: any) => api.post('/tasks', d),
+    mutationFn: (d: TaskInput) => api.post('/tasks', d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); setShowForm(false) },
   })
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...d }: any) => api.put(`/tasks/${id}`, d),
+    mutationFn: ({ id, ...d }: Partial<TaskInput> & { id: number }) => api.put(`/tasks/${id}`, d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); setEditing(null) },
   })
   const deleteMutation = useMutation({

@@ -3,7 +3,10 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { AlertTriangle, Clock, CheckCircle2, TrendingUp, Plus, ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import api from '../lib/api'
-import type { DashboardStats } from '../types'
+import type { DashboardStats, WorkOrderSummary } from '../types'
+
+// GET /dashboard/overdue: solo lo que se muestra, y la entrega estimada siempre viene (por eso está vencida)
+type OTVencida = Pick<WorkOrderSummary, 'id' | 'ot_number' | 'equipment_type' | 'status'> & { estimated_delivery: string }
 import { STATUS_LABELS } from '../lib/constants'
 
 const STATUS_BAR_COLORS: Record<string, string> = {
@@ -46,7 +49,7 @@ export default function Dashboard() {
     refetchInterval: 60_000,
   })
 
-  const { data: overdue = [] } = useQuery({
+  const { data: overdue = [] } = useQuery<OTVencida[]>({
     queryKey: ['overdue'],
     queryFn: () => api.get('/dashboard/overdue').then(r => r.data),
   })
@@ -102,7 +105,7 @@ export default function Dashboard() {
                   cursor={{ fill: '#F1F5F9' }}
                 />
                 <Bar dataKey="ots" radius={[4, 4, 0, 0]}>
-                  {(stats?.monthly_trend ?? []).map((_: any, i: number) => (
+                  {(stats?.monthly_trend ?? []).map((_, i) => (
                     <Cell key={i} fill={i === (stats?.monthly_trend?.length ?? 1) - 1 ? '#F97316' : '#3B82F6'} />
                   ))}
                 </Bar>
@@ -150,7 +153,7 @@ export default function Dashboard() {
             </Link>
           </div>
           <div className="space-y-1.5">
-            {overdue.map((ot: any) => (
+            {overdue.map(ot => (
               <Link key={ot.id} to={`/ots/${ot.id}`}
                 className="flex items-center gap-4 px-3 py-2 rounded-lg border border-red-100 hover:border-red-300 hover:bg-red-50 transition-colors cursor-pointer">
                 <span className="font-mono text-xs font-semibold text-red-600">{ot.ot_number}</span>

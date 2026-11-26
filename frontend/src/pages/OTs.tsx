@@ -49,8 +49,7 @@ export default function OTs() {
          .then(r => r.data),
   })
 
-  const grouped: Record<OTStatus, WorkOrderSummary[]> = {} as any
-  KANBAN_COLS.forEach(s => { grouped[s] = [] })
+  const grouped = Object.fromEntries(KANBAN_COLS.map(s => [s, [] as WorkOrderSummary[]])) as Record<OTStatus, WorkOrderSummary[]>
   ots.forEach(ot => { if (grouped[ot.status]) grouped[ot.status].push(ot) })
 
   return (
