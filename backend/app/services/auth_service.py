@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import bcrypt
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 from sqlalchemy.orm import Session
 from ..models.user import User
 from ..config import settings
@@ -27,7 +28,7 @@ def create_access_token(data: dict) -> str:
 def decode_token(token: str) -> Optional[dict]:
     try:
         return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-    except JWTError:
+    except InvalidTokenError:
         return None
 
 
